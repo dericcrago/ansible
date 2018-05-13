@@ -14,7 +14,9 @@ import time
 try:
     # requests is required for exception handling of the ConnectionError
     import requests
-    from pyVim import connect
+    from cached_property import cached_property
+    from pyVim.connect import Disconnect, SmartConnect, SmartConnectNoSSL
+    from pyVim.task import WaitForTask
     from pyVmomi import vim, vmodl
     HAS_PYVMOMI = True
 except ImportError:
@@ -23,6 +25,132 @@ except ImportError:
 from ansible.module_utils._text import to_text
 from ansible.module_utils.six import integer_types, iteritems, string_types
 from ansible.module_utils.basic import env_fallback
+
+
+def get_inventory_path(vmware_object, datacenter=False):
+    child = vmware_object
+    path = child.name
+
+    try:
+        while child.parent:
+            if not datacenter and isinstance(child, vim.Datacenter):
+                break
+            child = child.parent
+            path = "{}/{}".format(child.name, path)
+    except AttributeError:
+        pass
+
+    return path
+
+
+class vSphereHelper(object):
+    def __init__(self, module):
+        self.module = module
+        self.params = module.params
+
+    def fail_json(self, **kwargs):
+        self.disconnect()
+        self.module.fail_json(**kwargs)
+
+    def exit_json(self, **kwargs):
+        self.disconnect()
+        self.module.exit_json(**kwargs)
+
+    def disconnect(self):
+        if self.si:
+            Disconnect(self.si)
+            del self.si
+
+    @cached_property
+    def si(self):
+        connection_kwargs = {
+            'host': self.params['host'],
+            'user': self.params['username'],
+            'pwd': self.params['password'],
+            'port': self.params['port']
+        }
+
+        try:
+            if self.params['verify_ssl']:
+                return SmartConnect(**connection_kwargs)
+            else:
+                return SmartConnectNoSSL(**connection_kwargs)
+        except Exception as e:
+            self.module.fail_json(msg="message: '{}', args: '{}'".format(e.message, e.args))
+
+    @property
+    def fileManager(self):
+        return self.si.content.fileManager
+
+    @property
+    def propertyCollector(self):
+        return self.si.content.propertyCollector
+
+    @property
+    def searchIndex(self):
+        return self.si.content.searchIndex
+
+    @cached_property
+    def datacenter(self):
+        datacenter_arg = self.params['datacenter']
+        result = None
+        if type(datacenter_arg) == dict:
+            if "inventory_path" in datacenter_arg:
+                result = self.searchIndex.FindByInventoryPath(datacenter_arg["inventory_path"])
+        if isinstance(result, vim.Datacenter):
+            return result
+        else:
+            self.fail_json(msg="failed to find datacenter by: {}".format(datacenter_arg))
+
+    @cached_property
+    def datastore(self):
+        datastore_path = "{}/datastore/{}".format(self.params['datacenter_path'],
+                                                  self.params['datastore_path'])
+        result = self.searchIndex.FindByInventoryPath(datastore_path)
+        if isinstance(result, vim.Datastore):
+            return result
+        else:
+            self.fail_json(msg="failed to find datastore by path: {}".format(datastore_path))
+
+    @cached_property
+    def vm(self):
+        vm_arg = self.params['vm']
+        result = None
+        if type(vm_arg) == dict:
+            if "inventory_path" in vm_arg:
+                vm_path = "{}/vm/{}".format(get_inventory_path(self.datacenter, True),
+                                            self.params['vm']["inventory_path"])
+                result = self.searchIndex.FindByInventoryPath(vm_path)
+                if isinstance(result, vim.VirtualMachine):
+                    return result
+                else:
+                    self.fail_json(msg="failed to find vm by path: {}".format(vm_path))
+        if isinstance(result, vim.VirtualMachine):
+            return result
+        else:
+            self.fail_json(msg="failed to find vm by: {}".format(vm_arg))
+
+    def _get_vm_by_uuid(self):
+        vm_uuid = self.params['vm_uuid']
+        vmSearch = True
+        instanceUuid = False
+        result = self.searchIndex.FindByUuid(self.datacenter, vm_uuid,
+                                             vmSearch, instanceUuid)
+        if isinstance(result, vim.VirtualMachine):
+            return result
+        else:
+            self.fail_json(msg="failed to find vm by uuid: {}".format(vm_uuid))
+
+    def wait_for_task(self, task, raiseOnError=True, si=None, pc=None,
+                      onProgressUpdate=None):
+        if not si:
+            si = self.si
+
+        if not pc:
+            pc = self.propertyCollector
+
+        return WaitForTask(task, raiseOnError=raiseOnError, si=si, pc=pc,
+                           onProgressUpdate=onProgressUpdate)
 
 
 class TaskError(Exception):
@@ -472,14 +600,19 @@ def connect_to_api(module, disconnect_atexit=True):
         module.fail_json(msg='pyVim does not support changing verification mode with python < 2.7.9. Either update '
                              'python or use validate_certs=false.')
 
-    ssl_context = None
-    if not validate_certs and hasattr(ssl, 'SSLContext'):
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-        ssl_context.verify_mode = ssl.CERT_NONE
+    connection_kwargs = {
+        'host': hostname,
+        'user': username,
+        'pwd': password,
+        'port': port
+    }
 
     service_instance = None
     try:
-        service_instance = connect.SmartConnect(host=hostname, user=username, pwd=password, sslContext=ssl_context, port=port)
+        if validate_certs:
+            service_instance = SmartConnect(**connection_kwargs)
+        else:
+            service_instance = SmartConnectNoSSL(**connection_kwargs)
     except vim.fault.InvalidLogin as invalid_login:
         module.fail_json(msg="Unable to log on to vCenter or ESXi API at %s:%s as %s: %s" % (hostname, port, username, invalid_login.msg))
     except vim.fault.NoPermission as no_permission:
@@ -501,7 +634,7 @@ def connect_to_api(module, disconnect_atexit=True):
     # Such as IP change of the ESXi host which removes the connection anyway.
     # Also removal significantly speeds up the return of the module
     if disconnect_atexit:
-        atexit.register(connect.Disconnect, service_instance)
+        atexit.register(Disconnect, service_instance)
     return service_instance.RetrieveContent()
 
 
