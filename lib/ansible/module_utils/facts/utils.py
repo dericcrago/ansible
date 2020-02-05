@@ -53,6 +53,7 @@ def get_mount_size(mountpoint):
         statvfs_result = os.statvfs(mountpoint)
         mount_size['size_total'] = statvfs_result.f_frsize * statvfs_result.f_blocks
         mount_size['size_available'] = statvfs_result.f_frsize * (statvfs_result.f_bavail)
+        mount_size['size_used'] = mount_size['size_total'] - mount_size['size_available']
 
         # Block total/available/used
         mount_size['block_size'] = statvfs_result.f_bsize
