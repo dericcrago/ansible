@@ -23,11 +23,14 @@ jobs:
           git checkout tags/v2.10.5
           git clean -f -- .
 
+      - name: whoami?
+        run: whoami
+
       - name: install requirements
         run: |
-          apt update
-          apt -y upgrade
-          apt -y install --no-install-recommends \
+          sudo apt update
+          sudo apt -y upgrade
+          sudo apt -y install --no-install-recommends \
               make \
               python3-packaging \
               python3-setuptools \
@@ -41,9 +44,12 @@ jobs:
               dh-python \
               lsb-release \
               pbuilder
-          ln -s python3 /usr/bin/python
+          sudo ln -s python3 /usr/bin/python
 
       - name: build the dep
+        env:
+          PBUILDER_BIN: sudo pbuilder
         run: |
           ls -l
+          print ${PBUILDER_BIN}
           make clean && time make deb
