@@ -13,10 +13,13 @@ jobs:
     steps:
       - name: print DEB_DIST
         run: echo ${DEB_DIST}
-      - name: checkout v2.10.5
+      - name: checkout repo
         uses: actions/checkout@v2
-        with:
-          ref: tags/v2.10.5
+      - name: checkout v2.10.5
+        run: |
+          git fetch --prune --tags
+          git checkout tags/v2.10.5
+          git clean -f -- .
       - name: install requirements
         run: |
           apt update
