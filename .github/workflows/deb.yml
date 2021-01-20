@@ -44,7 +44,7 @@ jobs:
               dh-python \
               lsb-release \
               pbuilder
-          sudo ln -s python3 /usr/bin/python
+          sudo ln -sf python3 /usr/bin/python
 
       - name: build the dep
         env:
@@ -53,3 +53,9 @@ jobs:
           ls -l
           print ${PBUILDER_BIN}
           make clean && time make deb
+
+      - name: upload deb
+        uses: actions/upload-artifact@v2
+          with:
+            name: debs
+            path: deb-build/*/*.deb
