@@ -29,7 +29,6 @@ jobs:
       - name: install requirements
         run: |
           sudo apt update
-          sudo apt -y upgrade
           sudo apt -y install --no-install-recommends \
               make \
               python3-packaging \
@@ -51,7 +50,7 @@ jobs:
           PBUILDER_BIN: sudo pbuilder
         run: |
           ls -l
-          print ${PBUILDER_BIN}
+          echo ${PBUILDER_BIN}
           make clean && time make deb
 
       - name: upload deb
