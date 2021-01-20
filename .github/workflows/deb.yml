@@ -13,3 +13,29 @@ jobs:
     steps:
       - name: print DEB_DIST
         run: echo ${DEB_DIST}
+      - name: checkout v2.10.5
+        uses: actions/checkout@v2
+          ref: v2.10.5
+      - name: install requirements
+        run: |
+          apt update
+          apt -y upgrade
+          apt -y install --no-install-recommends \
+              make \
+              python3-packaging \
+              python3-setuptools \
+              python3-straight.plugin \
+              python3-jinja2 \
+              python3-yaml \
+              python3-docutils \
+              devscripts \
+              build-essential:native \
+              cdbs \
+              dh-python \
+              lsb-release \
+              pbuilder
+          ln -s python3 /usr/bin/python
+      - name: build the dep
+        run: |
+          ls -l
+          make clean && time make deb
