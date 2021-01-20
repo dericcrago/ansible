@@ -13,13 +13,16 @@ jobs:
     steps:
       - name: print DEB_DIST
         run: echo ${DEB_DIST}
+
       - name: checkout repo
         uses: actions/checkout@v2
+
       - name: checkout v2.10.5
         run: |
           git fetch --prune --tags
           git checkout tags/v2.10.5
           git clean -f -- .
+
       - name: install requirements
         run: |
           apt update
@@ -39,6 +42,7 @@ jobs:
               lsb-release \
               pbuilder
           ln -s python3 /usr/bin/python
+
       - name: build the dep
         run: |
           ls -l
