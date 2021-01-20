@@ -16,7 +16,7 @@ jobs:
       - name: checkout v2.10.5
         uses: actions/checkout@v2
         with:
-          ref: v2.10.5
+          ref: tags/v2.10.5
       - name: install requirements
         run: |
           apt update
