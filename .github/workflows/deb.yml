@@ -1,0 +1,15 @@
+---
+name: deb
+on:
+  push:
+    branches:
+      - deb_build_action
+env:
+  DEB_DIST: bionic focal
+jobs:
+  deb:
+    name: build deb
+    runs-on: ubuntu-20.04
+    steps:
+      - name: print DEB_DIST
+        run: echo ${DEB_DIST}
