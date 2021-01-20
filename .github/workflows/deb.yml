@@ -15,7 +15,8 @@ jobs:
         run: echo ${DEB_DIST}
       - name: checkout v2.10.5
         uses: actions/checkout@v2
-          ref: tags/v2.10.5
+        with:
+          ref: v2.10.5
       - name: install requirements
         run: |
           apt update
