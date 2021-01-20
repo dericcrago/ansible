@@ -6,26 +6,12 @@ on:
       - deb_build_action
 env:
   DEB_DIST: bionic focal
+  PBUILDER_BIN: sudo pbuilder
 jobs:
   deb:
     name: build deb
     runs-on: ubuntu-20.04
     steps:
-      - name: print DEB_DIST
-        run: echo ${DEB_DIST}
-
-      - name: checkout repo
-        uses: actions/checkout@v2
-
-      - name: checkout v2.10.5
-        run: |
-          git fetch --prune --tags
-          git checkout tags/v2.10.5
-          git clean -f -- .
-
-      - name: whoami?
-        run: whoami
-
       - name: install requirements
         run: |
           sudo apt update
@@ -45,16 +31,34 @@ jobs:
               pbuilder
           sudo ln -sf python3 /usr/bin/python
 
-      - name: build the dep
-        env:
-          PBUILDER_BIN: sudo pbuilder
+      - name: checkout repo
+        uses: actions/checkout@v2
+
+      - name: checkout v2.10.5
         run: |
-          ls -l
-          echo ${PBUILDER_BIN}
-          make clean && time make deb
+          git fetch --prune --tags
+          git checkout tags/v2.10.5
+          git clean -f -- .
+
+      - name: build the v2.10.5 debs
+        run: make clean && time make deb
 
       - name: upload deb
         uses: actions/upload-artifact@v2
         with:
-          name: debs
+          name: debs-v2.10.5
+          path: deb-build/*/*.deb
+
+      - name: checkout devel
+        run: |
+          git checkout devel
+          git clean -f -- .
+
+      - name: build the devel debs
+        run: make clean && time make deb
+
+      - name: upload deb
+        uses: actions/upload-artifact@v2
+        with:
+          name: debs-devel
           path: deb-build/*/*.deb
