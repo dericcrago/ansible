@@ -56,6 +56,6 @@ jobs:
 
       - name: upload deb
         uses: actions/upload-artifact@v2
-          with:
-            name: debs
-            path: deb-build/*/*.deb
+        with:
+          name: debs
+          path: deb-build/*/*.deb
